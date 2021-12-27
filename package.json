@@ -4,6 +4,7 @@
   "description": "Task scheduling module for AfterImage",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "jest"
   },
   "author": "Derek Noble",
