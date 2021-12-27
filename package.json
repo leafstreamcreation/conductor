@@ -1,0 +1,15 @@
+{
+  "name": "conductor",
+  "version": "1.0.0",
+  "description": "Task scheduling module for AfterImage",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "author": "Derek Noble",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "mongoose": "^6.1.3"
+  }
+}
