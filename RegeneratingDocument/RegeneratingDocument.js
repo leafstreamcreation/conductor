@@ -7,7 +7,8 @@ module.exports = class RegeneratingDocument {
 
         if(Date.now() > nextRegenTime) {
             action(document);
-            this.nextRegenTime = Date.now() + regenFrequency;
+            const timeOverdue = Date.now() - nextRegenTime;
+            this.nextRegenTime = Date.now() + regenFrequency - (timeOverdue % regenFrequency);
         }
         setTimeout(() => {
             action(document);
