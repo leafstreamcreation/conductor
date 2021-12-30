@@ -1,6 +1,7 @@
 {
   "name": "conductor",
   "version": "1.0.0",
+  "private": true,
   "description": "Task scheduling module for AfterImage",
   "main": "index.js",
   "scripts": {
