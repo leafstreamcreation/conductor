@@ -6,7 +6,6 @@ module.exports = class RegeneratingDocument {
         this.nextRegenTime = nextRegenTime;
 
         if(Date.now() > nextRegenTime) {
-            action(document);
             const timeOverdue = Date.now() - nextRegenTime;
             this.nextRegenTime = Date.now() + regenFrequency - (timeOverdue % regenFrequency);
         }
