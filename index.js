@@ -5,7 +5,7 @@ const taskSchema = require("./models/Task.model");
 require("dotenv/config");
 
 
-const MS12HOURREFRESH = 1000 * 60 * 60 * 12;
+const MS12HOURREFRESH = 1000;// * 60 * 60 * 12;
 
 const MONGO_URI = "mongodb://localhost/pudge-pile"; //process.env.MONGODB_URI || 
 const MONGO_URI2 = "mongodb://localhost/someotherdb";
@@ -39,7 +39,7 @@ mongooseConnections[1] = mongoose.createConnection(MONGO_URI2, options).asPromis
 Promise.all(mongooseConnections).then(() => {
     setTimeout(() => {
         refresh();
-        // setInterval(refresh, MS12HOURREFRESH);
+        setInterval(refresh, MS12HOURREFRESH);
     }, nextRefreshTime());
 });
 
@@ -47,21 +47,50 @@ Promise.all(mongooseConnections).then(() => {
 async function initializeAndLoadTasks(name) {
     const connection = mongoose.connections.find(conn => conn.name === name);
     const RegeneratingTask = connection.model("RegeneratingTask", regenTaskSchema);
-    connection.model("Task", taskSchema);
+    const Task = connection.model("Task", taskSchema);
     const regenTaskData = await RegeneratingTask.find().select(["-_id", "text", "regenInterval", "scheduleDate"]).exec();
-    regenTaskSets[name] = regenTaskData;
+    for (const data of regenTaskData) {
+        const { text, regenInterval, scheduleDate } = data;
+        regenTaskSets[name][text] = new RegeneratingDocument({ model: Task, data: {text} }, regenInterval, async () => {
+            Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec();
+        }, scheduleDate);
+    }
 }
 
 
 
 async function refresh() {
-    console.log(regenTaskSets);
-    for (const set in regenTaskSets) {
-        const connection = mongoose.connections.find(conn => conn.name === set);
-        console.log(set, connection.modelNames());
+    const [_, ...connections] = mongoose.connections;
+    for (const connection of connections) {
+        const RegeneratingTask = connection.model("RegeneratingTask");
+        const Task = connection.model("Task");
+        const deletedTasks = Object.assign({}, regenTaskSets[connection.name]);
+        const taskList = await RegeneratingTask.find().select(["-_id", "text", "regenInterval", "scheduleDate"]).exec();
+        for (const task of taskList) {
+            const text = task.text;
+            if(!regenTaskSets[connection.name][text]) {
+                console.log("found a new task");
+                regenTaskSets[connection.name][text] = new RegeneratingDocument({ model: Task, data: {text} }, regenInterval, async () => {
+                    Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec();
+                }, scheduleDate);
+            } 
+            else if (deletedTasks[text]) delete deletedTasks[text];
+                
+        }
+        for (const key in deletedTasks) {
+            console.log("deleting task");
+            regenTaskSets[connection.name][key].terminate();
+            delete regenTaskSets[connection.name][key];
+        }
     }
 
-    mongoose.connections.forEach(conn => conn.close());
+    // console.log(regenTaskSets);
+    // for (const set in regenTaskSets) {
+    //     const connection = mongoose.connections.find(conn => conn.name === set);
+    //     console.log(set, connection.modelNames());
+    // }
+
+    // mongoose.connections.forEach(conn => conn.close());
 }
 
 function nextRefreshTime() {
@@ -98,33 +127,4 @@ function nextRefreshTime() {
 //         });
 //     }
     
-//     async function regenerate({ text }) {
-//         const taskList = await RegeneratingTask.find().select(["-_id", "text", "regenInterval", "scheduleDate"]);
-//         if (taskList.length === 0) { 
-//             if (!refetchThread.isActive) {
-//                 refetchThread.id = setInterval(start, MSDAILYREFRESH);
-//                 refetchThread.isActive = true;
-//             }
-//             removeDocument(text);
-//         }
-//         else {
-//             if(refetchThread.isActive) {
-//                 clearInterval(refetchThread.id);
-//                 refetchThread.isActive = false;
-//             }
-//             let found = false;
-//             for(const task of taskList) {
-//                 if (!tasks[task.text]) {
-//                     tasks[task.text] = new RegeneratingDocument({ text: task.text }, task.regenInterval, regenerate, task.scheduleDate);
-//                 }
-//                 if (task.text === text) found = true;
-//             }
-//             found ? Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec() : removeDocument(text);
-//         }
-//     }
-    
-//     function removeDocument(id) {
-//         tasks[id].terminate();
-//         delete tasks[id];
-//     }
 //   })
