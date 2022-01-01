@@ -84,6 +84,6 @@ async function refresh() {
 
 function nextRefreshTime() {
     const thisHour = new Date().getUTCHours();
-    if (thisHour < 7 || thisHour >= 19) return (new Date().setUTCHours(7,0,0,0)) - Date.now();
-    else return (new Date().setUTCHours(19,0,0,0)) - Date.now();
+    if (thisHour < 9 || thisHour >= 21) return (new Date().setUTCHours(9,0,0,0)) - Date.now();
+    else return (new Date().setUTCHours(21,0,0,0)) - Date.now();
 }
