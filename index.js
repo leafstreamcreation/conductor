@@ -5,24 +5,22 @@ const taskSchema = require("./models/Task.model");
 require("dotenv/config");
 
 
-const MS12HOURREFRESH = 1000;// * 60 * 60 * 12;
+const MS12HOURREFRESH = 1000 * 60 * 60 * 12;
 
-const MONGO_URI = "mongodb://localhost/pudge-pile"; //process.env.MONGODB_URI || 
-const MONGO_URI2 = "mongodb://localhost/someotherdb";
+const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost/pudge-pile";
+const MONGO_URI2 = process.env.MONGODB_URI_2 || "mongodb://localhost/someotherdb";
 
 const options = {
     minPoolSize: 10,
 };
 
 const regenTaskSets = {
-    "pudge-pile": {},
-    "someotherdb": {},
 };
 
 const mongooseConnections = [];
 
 mongooseConnections[0] = mongoose.createConnection(MONGO_URI, options).asPromise().then(async () => {
-    initializeAndLoadTasks("pudge-pile");
+    initializeAndLoadTasks(mongoose.connections[1].name);
 })
 .catch((err) => {
   console.error("Error connecting to mongo: ", err);
@@ -30,7 +28,7 @@ mongooseConnections[0] = mongoose.createConnection(MONGO_URI, options).asPromise
 
 
 mongooseConnections[1] = mongoose.createConnection(MONGO_URI2, options).asPromise().then(async () => {
-    initializeAndLoadTasks("someotherdb");
+    initializeAndLoadTasks(mongoose.connections[2].name);
 })
 .catch((err) => {
   console.error("Error connecting to mongo: ", err);
@@ -45,6 +43,7 @@ Promise.all(mongooseConnections).then(() => {
 
 
 async function initializeAndLoadTasks(name) {
+    regenTaskSets[name] = {};
     const connection = mongoose.connections.find(conn => conn.name === name);
     const RegeneratingTask = connection.model("RegeneratingTask", regenTaskSchema);
     const Task = connection.model("Task", taskSchema);
@@ -67,9 +66,8 @@ async function refresh() {
         const deletedTasks = Object.assign({}, regenTaskSets[connection.name]);
         const taskList = await RegeneratingTask.find().select(["-_id", "text", "regenInterval", "scheduleDate"]).exec();
         for (const task of taskList) {
-            const text = task.text;
+            const { text, regenInterval, scheduleDate } = task;
             if(!regenTaskSets[connection.name][text]) {
-                console.log("found a new task");
                 regenTaskSets[connection.name][text] = new RegeneratingDocument({ model: Task, data: {text} }, regenInterval, async () => {
                     Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec();
                 }, scheduleDate);
@@ -78,53 +76,14 @@ async function refresh() {
                 
         }
         for (const key in deletedTasks) {
-            console.log("deleting task");
             regenTaskSets[connection.name][key].terminate();
             delete regenTaskSets[connection.name][key];
         }
     }
-
-    // console.log(regenTaskSets);
-    // for (const set in regenTaskSets) {
-    //     const connection = mongoose.connections.find(conn => conn.name === set);
-    //     console.log(set, connection.modelNames());
-    // }
-
-    // mongoose.connections.forEach(conn => conn.close());
 }
 
 function nextRefreshTime() {
-    return 1000;
+    const thisHour = new Date().getUTCHours();
+    if (thisHour < 7 || thisHour >= 19) return (new Date().setUTCHours(7,0,0,0)) - Date.now();
+    else return (new Date().setUTCHours(19,0,0,0)) - Date.now();
 }
-
-
-//think I might just need to make another connection here; test locally
-// mongoose
-//   .connect(MONGO_URI)
-//   .then((x) => {
-//     console.log(`Connected to Mongo! Database name: "${x.connections[0].name}"`);
-
-//     const tasks = {};
-//     const MSDAILYREFRESH = 1000 * 60 * 60 * 24;
-//     const refetchThread = {
-//         id: 0,
-//         isActive: false,
-//     };
-
-//     start();
-    
-
-//     function start() {
-//         RegeneratingTask.find().select(["-_id", "text", "regenInterval", "scheduleDate"]).then(taskData => {
-//             if (!refetchThread.isActive && taskData.length === 0) {
-//                 refetchThread.id = setInterval(start, MSDAILYREFRESH);
-//                 refetchThread.isActive = true;
-//             }
-//             else for (const data of taskData) {
-//                 const { text, regenInterval, scheduleDate } = data;
-//                 tasks[text] = new RegeneratingDocument({ text }, regenInterval, regenerate, scheduleDate);
-//             }
-//         });
-//     }
-    
-//   })
