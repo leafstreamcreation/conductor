@@ -52,7 +52,7 @@ async function initializeAndLoadTasks(name) {
     for (const data of regenTaskData) {
         const { text, regenInterval, scheduleDate } = data;
         regenTaskSets[name][text] = new RegeneratingDocument({ model: Task, data: {text} }, regenInterval, async () => {
-            console.log(text);
+            // console.log(text);
             Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec();
         }, scheduleDate);
     }
@@ -75,7 +75,7 @@ async function refresh() {
             if(!regenDocForTask) {
                 // console.log("new task");
                 regenTaskSets[connection.name][text] = new RegeneratingDocument({ model: Task, data: {text} }, regenInterval, async () => {
-                    console.log(text);
+                    // console.log(text);
                     Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec();
                 }, scheduleDate);
             } 
