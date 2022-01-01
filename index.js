@@ -35,6 +35,7 @@ mongooseConnections[1] = mongoose.createConnection(MONGO_URI2, options).asPromis
 });
 
 Promise.all(mongooseConnections).then(() => {
+    // console.log("START: ", regenTaskSets);
     setTimeout(() => {
         refresh();
         setInterval(refresh, MS12HOURREFRESH);
@@ -51,6 +52,7 @@ async function initializeAndLoadTasks(name) {
     for (const data of regenTaskData) {
         const { text, regenInterval, scheduleDate } = data;
         regenTaskSets[name][text] = new RegeneratingDocument({ model: Task, data: {text} }, regenInterval, async () => {
+            // console.log(text);
             Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec();
         }, scheduleDate);
     }
@@ -59,6 +61,7 @@ async function initializeAndLoadTasks(name) {
 
 
 async function refresh() {
+    // console.log("tick");
     const [_, ...connections] = mongoose.connections;
     for (const connection of connections) {
         const RegeneratingTask = connection.model("RegeneratingTask");
@@ -67,15 +70,25 @@ async function refresh() {
         const taskList = await RegeneratingTask.find().select(["-_id", "text", "regenInterval", "scheduleDate"]).exec();
         for (const task of taskList) {
             const { text, regenInterval, scheduleDate } = task;
-            if(!regenTaskSets[connection.name][text]) {
+            const regenDocForTask = regenTaskSets[connection.name][text];
+            //handle a new ongoing task
+            if(!regenDocForTask) {
+                // console.log("new task");
                 regenTaskSets[connection.name][text] = new RegeneratingDocument({ model: Task, data: {text} }, regenInterval, async () => {
+                    // console.log(text);
                     Task.findOneAndUpdate({text}, {text}, {upsert: true}).exec();
                 }, scheduleDate);
             } 
-            else if (deletedTasks[text]) delete deletedTasks[text];
-                
+            //handle updating an ongoing task
+            else if (deletedTasks[text]) {
+                delete deletedTasks[text];
+                const sameData = regenDocForTask.hasData(regenInterval, scheduleDate);
+                if (!sameData) regenTaskSets[connection.name][text].updateWith(regenInterval, scheduleDate);
+            }
         }
         for (const key in deletedTasks) {
+            //handle ongoing task deletion
+                // console.log("delete task");
             regenTaskSets[connection.name][key].terminate();
             delete regenTaskSets[connection.name][key];
         }
@@ -83,6 +96,7 @@ async function refresh() {
 }
 
 function nextRefreshTime() {
+    // return 1000;
     const thisHour = new Date().getUTCHours();
     if (thisHour < 9 || thisHour >= 21) return (new Date().setUTCHours(9,0,0,0)) - Date.now();
     else return (new Date().setUTCHours(21,0,0,0)) - Date.now();
