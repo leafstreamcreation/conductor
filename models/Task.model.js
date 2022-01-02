@@ -1,5 +1,8 @@
 const { Schema } = require("mongoose");
 
-module.exports = new Schema({
+const taskSchema = new Schema({
   text: { type: String, required: true, unique: true },
+  updates: { type: [Date] },
 });
+
+module.exports = taskSchema;
