@@ -44,19 +44,19 @@ describe("RegenDocument tests", () => {
         doc.terminate();
     });
 
-    test("action fires in time with regenInterval starting from schedule date", async () => {
-        const SCHEDULE_DATE = Date.now() + 1500;
-        const REGENTIME = 1000;
+    test("action fires in time with when past schedule date", async () => {
+        const SCHEDULE_DATE = Date.now() - 3000;
+        const REGENTIME = 2000;
+        const EXPECTED_DATE = SCHEDULE_DATE + 4000;
         let firingDate = 0;
         const doc = new RegeneratingDocument({}, REGENTIME, () => {
             firingDate = Date.now();
         }, SCHEDULE_DATE);
-        await new Promise((resolve) => {setTimeout(resolve, 1490)});
+        await new Promise((resolve) => {setTimeout(resolve, 990)});
         expect(firingDate).toBe(0);
         await new Promise((resolve) => {setTimeout(resolve, 20)});
-        const deviation = Math.abs(1 - (firingDate / (SCHEDULE_DATE)));
+        const deviation = Math.abs(1 - (firingDate / (EXPECTED_DATE)));
         expect(deviation).toBeCloseTo(0.0, 2);
         doc.terminate();
     });
-    
 });
